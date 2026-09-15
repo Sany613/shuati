@@ -22,7 +22,7 @@ main{padding:15px}.page{display:none}.page.on{display:block}.hero{background:lin
 .brand-version{display:inline-block;margin-left:5px;padding:1px 6px;border:1px solid currentColor;border-radius:999px;font-size:.55em;font-weight:600;opacity:.65;vertical-align:middle;line-height:1.25}
 </style></head>
 <body>
-<div class="app"><header><div class="top"><div><div class="brand">刷题通 <span class="brand-version">V6.6</span></div><div class="sub" id="subhead">多题库 · 智能练习 · 模拟考试</div></div><button class="gear" onclick="settings()">⚙️</button></div></header>
+<div class="app"><header><div class="top"><div><div class="brand">刷题通 <span class="brand-version">V6.7</span></div><div class="sub" id="subhead">多题库 · 智能练习 · 模拟考试</div></div><button class="gear" onclick="settings()">⚙️</button></div></header>
 <main><section id="home" class="page on"></section><section id="practice" class="page"></section><section id="wrong" class="page"></section><section id="fav" class="page"></section><section id="stats" class="page"></section><section id="quiz" class="page"></section></main>
 <div class="bottom"><nav class="nav"><button data-p="home" onclick="go('home')"><i>⌂</i>首页</button><button data-p="practice" onclick="go('practice')"><i>◉</i>练习</button><button data-p="wrong" onclick="go('wrong')"><i>✕</i>错题</button><button data-p="fav" onclick="go('fav')"><i>☆</i>收藏</button><button data-p="stats" onclick="go('stats')"><i>▥</i>统计</button></nav></div></div>
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div><div id="toast" class="toast"></div>
@@ -113,8 +113,54 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installProm
 window.addEventListener('error',e=>console.error('APP ERROR',e.error||e.message));
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('SW',e));
 function parseCSV(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(c==='"'){if(q&&n==='"'){cell+='"';i++;}else q=!q}else if(c===','&&!q){row.push(cell);cell=''}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);cell='';if(row.some(x=>x.trim()))rows.push(row);row=[]}else cell+=c}if(cell||row.length){row.push(cell);rows.push(row)}return rows}
-function normalizeImported(raw){let a=Array.isArray(raw)?raw:(raw.questions||raw.data||raw.items||[]);if(!Array.isArray(a))throw new Error('no questions');return a.map((x,i)=>{if(typeof x==='string')return {id:i+1,subject:'',chapter:'',type:'单选题',difficulty:'',question:x,options:['','','',''],answer:''};let options=Array.isArray(x.options)?x.options.slice(0,4):(x.options&&typeof x.options==='object'?[x.options.A,x.options.B,x.options.C,x.options.D].map(v=>v??''):[x.A,x.B,x.C,x.D].map(v=>v??''));let type=x.type||x.题型||x.questionType||'';let answer=x.answer??x.答案??x.correct??x.correctAnswer??'';if(!type){const n=options.filter(Boolean).length;if(n>=2)type='单选题';else if(n===0){const a=String(answer).trim().toUpperCase();type=['T','F','TRUE','FALSE','正确','错误','对','错','√','×'].includes(a)?'判断题':'填空题'}else type='单选题'}if(type.includes('判断')){const s=String(answer).trim().toUpperCase();answer=['T','TRUE','正确','√','对','是'].includes(s)?'T':['F','FALSE','错误','×','错','否'].includes(s)?'F':answer}return {id:String(x.id??x.序号??i+1),subject:x.subject??x.科目名称??'',chapter:x.chapter??x.章节名称??'',type,difficulty:x.difficulty??x.难易度??'',question:String(x.question??x.题目要求??x.题目??x.title??''),options,answer:String(answer).trim()}}).filter(x=>x.question)}
+function normalizeImported(raw){
+  let a=Array.isArray(raw)?raw:(raw.questions||raw.data||raw.items||[]);
+  if(!Array.isArray(a))throw new Error('no questions');
+  const pick=(x,names)=>{for(const n of names){if(x&&x[n]!==undefined&&x[n]!==null&&String(x[n]).trim()!=='')return x[n]}return ''};
+  return a.map((x,i)=>{
+    if(typeof x==='string')return {id:i+1,subject:'',chapter:'',type:'填空题',difficulty:'',question:x,options:['','','',''],answer:''};
+    const optionsObj=x.options&&typeof x.options==='object'&&!Array.isArray(x.options)?x.options:null;
+    let options=Array.isArray(x.options)?x.options.slice(0,4):[
+      pick(optionsObj,['A','a','选项A','选项a'])||pick(x,['A','a','选项A','选项a','optionA','选项1']),
+      pick(optionsObj,['B','b','选项B','选项b'])||pick(x,['B','b','选项B','选项b','optionB','选项2']),
+      pick(optionsObj,['C','c','选项C','选项c'])||pick(x,['C','c','选项C','选项c','optionC','选项3']),
+      pick(optionsObj,['D','d','选项D','选项d'])||pick(x,['D','d','选项D','选项d','optionD','选项4'])
+    ].map(v=>v??'');
+    let type=pick(x,['type','题型','questionType','类型']);
+    let answer=pick(x,['answer','答案','correct','correctAnswer','正确答案','参考答案']);
+    const question=String(pick(x,['question','题目要求','题目','title','题干','题目内容'])||'').trim();
+    if(!type){const n=options.filter(v=>String(v).trim()).length;type=n>=2?'单选题':(['T','F','TRUE','FALSE','正确','错误','对','错','√','×'].includes(String(answer).trim().toUpperCase())?'判断题':'填空题')}
+    if(String(type).includes('判断')){const z=String(answer).trim().toUpperCase();answer=['T','TRUE','正确','√','对','是'].includes(z)?'T':['F','FALSE','错误','×','错','否'].includes(z)?'F':answer}
+    return {id:String(pick(x,['id','序号'])||i+1),subject:pick(x,['subject','科目名称','科目']),chapter:pick(x,['chapter','章节名称','章节']),type:String(type),difficulty:pick(x,['difficulty','难易度','难度']),question,options:options.map(v=>String(v??'').trim()),answer:String(answer??'').trim()};
+  }).filter(x=>x.question);
+}
+
 function rowsToQuestions(rows){if(!rows.length)throw new Error('empty');let h=rows[0].map(x=>String(x).trim()),find=(...names)=>{const i=h.findIndex(v=>names.includes(v));return i<0?-1:i};const iq=find('题目要求','题目','题干','question','Question'),ia=find('答案','answer','Answer','正确答案'),it=find('题型','类型','type','Type'),ic=find('章节名称','章节','chapter','Chapter'),id=find('难易度','难度','difficulty'),is=find('科目名称','科目','subject');const io=['选项A','A','选项A内容','optionA','A选项'].map(n=>find(n)),ib=find('B','选项B'),ic2=find('C','选项C'),id2=find('D','选项D');if(iq<0)throw new Error('找不到题目列');return rows.slice(1).map((r,i)=>{const get=j=>j>=0?(r[j]??''):'';let opts=io.map(j=>get(j));if(opts.filter(Boolean).length===0)opts=[get(find('A')),get(ib),get(ic2),get(id2)];return {id:i+1,subject:get(is),chapter:get(ic),type:get(it)||'单选题',difficulty:get(id),question:get(iq),options:opts.slice(0,4),answer:get(ia)}}).filter(x=>String(x.question).trim())}
+function autoRepairQuestionBank(arr){
+  let fixed=0;
+  const out=(arr||[]).map(q=>{
+    const x={...q,options:Array.isArray(q.options)?q.options.slice(0,4):['','','','']};
+    const before=JSON.stringify(x);
+    const norm=v=>String(v??'').trim();
+    x.options=x.options.map(v=>norm(v));
+    // 修复选项前缀：A. xxx / A、xxx / A) xxx
+    x.options=x.options.map((v,i)=>v.replace(new RegExp('^\\s*'+String.fromCharCode(65+i)+'\\s*[.、)）:：]\\s*'),'').trim());
+    x.answer=norm(x.answer).replace(/^答案\\s*[:：]?\\s*/i,'').trim();
+    if(String(x.type).includes('判断')){
+      const z=x.answer.toUpperCase();
+      if(['T','TRUE','正确','√','对','是'].includes(z))x.answer='T';
+      else if(['F','FALSE','错误','×','错','否'].includes(z))x.answer='F';
+    }else if(String(x.type).includes('多选')){
+      x.answer=cleanMultiAnswer(x.answer);
+    }else if(String(x.type).includes('单选')){
+      const m=x.answer.toUpperCase().match(/[ABCD]/);
+      if(m)x.answer=m[0];
+    }
+    if(JSON.stringify(x)!==before)fixed++;
+    return x;
+  });
+  return {questions:out,fixed};
+}
 function validateQuestionBank(arr){
   const issues=[];
   (arr||[]).forEach((q,i)=>{
@@ -148,9 +194,9 @@ function handleConvFile(el){const file=el&&el.files&&el.files[0];if(!file)return
 async function previewConvert(file){if(!file)return;converterState.file=file;converterState.questions=[];const n=file.name.toLowerCase();try{let arr;if(n.endsWith('.json'))arr=normalizeImported(JSON.parse(await file.text()));else if(n.endsWith('.csv'))arr=rowsToQuestions(parseCSV(await file.text()));else if(n.endsWith('.txt'))arr=rowsToQuestions(parseCSV((await file.text()).replace(/\t/g,',')));else if(n.endsWith('.xlsx'))arr=await parseXLSX(file);else if(n.endsWith('.xls'))arr=await parseXLS(file);else throw new Error('不支持的文件格式');converterState.questions=arr;if(!arr.length)throw new Error('没有识别到题目，请检查表头和内容');document.getElementById('convInfo').textContent=`${file.name} · 识别 ${arr.length} 题`;renderConvertPreview();}catch(e){console.error(e);converterState.questions=[];document.getElementById('convInfo').textContent='转换失败：'+e.message;document.getElementById('convPreview').innerHTML='';}}
 function applyConvType(){const t=document.getElementById('convType')?.value;if(!t||t==='auto')return;converterState.questions=converterState.questions.map(q=>({...q,type:t}));renderConvertPreview();}
 function renderConvertPreview(){const a=converterState.questions.slice(0,8);document.getElementById('convPreview').innerHTML=a.length?validationSummary(converterState.questions)+`<div class="filehint">预览前 ${a.length} 题</div><div class="convert-preview">${a.map((q,i)=>`<div class="convert-row"><b>${i+1}. [${esc(q.type)}] ${esc(q.question)}</b><div class="muted">${q.options.filter(Boolean).map((o,j)=>`${String.fromCharCode(65+j)}. ${esc(o)}`).join('　')}</div><div>答案：${esc(q.answer||'（空）')}</div></div>`).join('')}</div>`:'<div class="empty">没有识别到题目</div>';}
-function importConverted(merge){const arr=converterState.questions;if(!arr.length)return toast('请先选择并成功解析文件');const issues=validateQuestionBank(arr);if(issues.length){renderConvertPreview();return toast(`检测到 ${issues.length} 个题库格式问题，请先修正`)}const name=(converterState.file?.name||'转换题库').replace(/\.(json|csv|txt|xlsx|xls)$/i,'');if(merge){const merged=dedup(qs().concat(arr));const id='lib_'+Date.now();S.libraries[id]={name:current().name+' + '+name,questions:merged};S.active=id;save();closeModal();go('home');toast(`转换并合并完成：${merged.length}题`)}else{const id='lib_'+Date.now();S.libraries[id]={name:name||'转换题库',questions:dedup(arr)};S.active=id;save();closeModal();go('home');toast(`转换并导入成功：${arr.length}题`)} }
+function importConverted(merge){const arr=converterState.questions;if(!arr.length)return toast('请先选择并成功解析文件');const repaired=autoRepairQuestionBank(arr);converterState.questions=repaired.questions;const issues=validateQuestionBank(converterState.questions);if(issues.length){renderConvertPreview();return toast(`自动修正 ${repaired.fixed} 处后仍发现 ${issues.length} 个问题，请检查`)}const name=(converterState.file?.name||'转换题库').replace(/\.(json|csv|txt|xlsx|xls)$/i,'');if(merge){const merged=dedup(qs().concat(arr));const id='lib_'+Date.now();S.libraries[id]={name:current().name+' + '+name,questions:merged};S.active=id;save();closeModal();go('home');toast(`转换并合并完成：${merged.length}题`)}else{const id='lib_'+Date.now();S.libraries[id]={name:name||'转换题库',questions:dedup(arr)};S.active=id;save();closeModal();go('home');toast(`转换并导入成功：${arr.length}题`)} }
 function exportConverted(){const a=converterState.questions;if(!a.length)return toast('请先选择并成功解析文件');download(JSON.stringify({name:converterState.file?.name||'转换题库',questions:dedup(a)},null,2),(converterState.file?.name||'转换题库').replace(/\.[^.]+$/,'')+'.json','application/json');toast('已导出转换后的 JSON')}
-async function importQuestionFile(file,merge){if(!file)return;try{const name=file.name.toLowerCase();let arr;if(name.endsWith('.json'))arr=normalizeImported(JSON.parse(await file.text()));else if(name.endsWith('.csv'))arr=rowsToQuestions(parseCSV(await file.text()));else if(name.endsWith('.txt'))arr=rowsToQuestions(parseCSV((await file.text()).replace(/\t/g,',')));else if(name.endsWith('.xlsx'))arr=await parseXLSX(file);else if(name.endsWith('.xls'))arr=await parseXLS(file);else throw new Error('不支持的文件格式');if(!arr.length)throw new Error('没有识别到题目');const issues=validateQuestionBank(arr);if(issues.length)throw new Error(`题库校验未通过：发现 ${issues.length} 个问题，请检查选择题选项和答案格式`);const libName=file.name.replace(/\.(json|csv|txt|xlsx|xls)$/i,'')||'新题库';if(merge){const all=qs().concat(arr);const merged=dedup(all);const id='lib_'+Date.now();S.libraries[id]={name:current().name+' + '+libName,questions:merged};S.active=id;save();closeModal();go('home');toast(`合并完成：${merged.length}题`)}else{const id='lib_'+Date.now();S.libraries[id]={name:libName,questions:dedup(arr)};S.active=id;save();closeModal();go('home');toast(`导入成功：${arr.length}题`)} }catch(e){console.error(e);toast('导入失败：'+e.message)}}
+async function importQuestionFile(file,merge){if(!file)return;try{const name=file.name.toLowerCase();let arr;if(name.endsWith('.json'))arr=normalizeImported(JSON.parse(await file.text()));else if(name.endsWith('.csv'))arr=rowsToQuestions(parseCSV(await file.text()));else if(name.endsWith('.txt'))arr=rowsToQuestions(parseCSV((await file.text()).replace(/\t/g,',')));else if(name.endsWith('.xlsx'))arr=await parseXLSX(file);else if(name.endsWith('.xls'))arr=await parseXLS(file);else throw new Error('不支持的文件格式');if(!arr.length)throw new Error('没有识别到题目');const repaired=autoRepairQuestionBank(arr);arr=repaired.questions;const issues=validateQuestionBank(arr);if(issues.length)throw new Error(`自动修正 ${repaired.fixed} 处后仍发现 ${issues.length} 个问题，请检查选择题选项和答案格式`);const libName=file.name.replace(/\.(json|csv|txt|xlsx|xls)$/i,'')||'新题库';if(merge){const all=qs().concat(arr);const merged=dedup(all);const id='lib_'+Date.now();S.libraries[id]={name:current().name+' + '+libName,questions:merged};S.active=id;save();closeModal();go('home');toast(`合并完成：${merged.length}题`)}else{const id='lib_'+Date.now();S.libraries[id]={name:libName,questions:dedup(arr)};S.active=id;save();closeModal();go('home');toast(`导入成功：${arr.length}题`)} }catch(e){console.error(e);toast('导入失败：'+e.message)}}
 
 function dedup(a){const seen=new Map(),out=[];for(const q of a){const k=norm(q.question)+'|'+norm(q.answer);if(!seen.has(k)){seen.set(k,1);out.push({...q,id:out.length+1})}}return out}
 function u16(a,o){return a[o]|(a[o+1]<<8)}
