@@ -22,7 +22,7 @@ main{padding:15px}.page{display:none}.page.on{display:block}.hero{background:lin
 .brand-version{display:inline-block;margin-left:5px;padding:1px 6px;border:1px solid currentColor;border-radius:999px;font-size:.55em;font-weight:600;opacity:.65;vertical-align:middle;line-height:1.25}
 </style></head>
 <body>
-<div class="app"><header><div class="top"><div><div class="brand">刷题通 <span class="brand-version">V6.9</span></div><div class="sub" id="subhead">多题库 · 智能练习 · 模拟考试</div></div><button class="gear" onclick="settings()">⚙️</button></div></header>
+<div class="app"><header><div class="top"><div><div class="brand">刷题通 <span class="brand-version">V6.11</span></div><div class="sub" id="subhead">多题库 · 智能练习 · 模拟考试</div></div><button class="gear" onclick="settings()">⚙️</button></div></header>
 <main><section id="home" class="page on"></section><section id="practice" class="page"></section><section id="wrong" class="page"></section><section id="fav" class="page"></section><section id="stats" class="page"></section><section id="quiz" class="page"></section></main>
 <div class="bottom"><nav class="nav"><button data-p="home" onclick="go('home')"><i>⌂</i>首页</button><button data-p="practice" onclick="go('practice')"><i>◉</i>练习</button><button data-p="wrong" onclick="go('wrong')"><i>✕</i>错题</button><button data-p="fav" onclick="go('fav')"><i>☆</i>收藏</button><button data-p="stats" onclick="go('stats')"><i>▥</i>统计</button></nav></div></div>
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div><div id="toast" class="toast"></div>
@@ -55,13 +55,24 @@ function home(){const q=qs(),done=q.filter(x=>S.answered[key(S.active,x.id)]).le
 document.getElementById('home').innerHTML=`<div class="hero"><h1>刷题通</h1><p>现在支持多题库管理、随机/专项练习、错题收藏、正式模拟、答题卡、统计分析，以及题库文件导入。</p><div class="mini"><span>📚 ${q.length}题</span><span>🧠 已做 ${done}</span><span>🎯 正确率 ${acc}%</span></div></div>
 <div class="stats"><div class="stat"><b>${q.length}</b><span>当前题库</span></div><div class="stat"><b>${done}</b><span>已练题</span></div><div class="stat"><b>${wrongN}</b><span>错题</span></div><div class="stat"><b>${favN}</b><span>收藏</span></div></div>
 <div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>今日进度 ${todayN}/${S.plans.daily}</b><button class="btn ghost small" onclick="setDaily()">目标</button></div><div class="bar" style="margin-top:9px"><i style="width:${Math.min(100,todayN/Math.max(1,S.plans.daily)*100)}%"></i></div><small class="muted">累计作答 ${S.attempts} 次 · 选择的题库：${esc(current().name)}</small></div>
-<div class="title">开始刷题</div><div class="grid"><button class="card action" onclick="start({n:20,random:true})"><span class="big">🎲</span><b>随机 20 题</b><small>优先抽取未练题</small></button><button class="card action" onclick="start({n:50,random:true})"><span class="big">🔥</span><b>冲刺 50 题</b><small>集中刷一轮</small></button><button class="card action" onclick="wrongStart()"><span class="big">❌</span><b>错题重练</b><small>${wrongN?wrongN+' 道错题待巩固':'目前没有错题'}</small></button><button class="card action" onclick="mock()"><span class="big">⏱️</span><b>正式模拟</b><small>50题 · 45分钟 · 自动计时</small></button></div>
+<div class="title">开始刷题</div><div class="grid"><button class="card action" onclick="start({n:20,random:true})"><span class="big">🎲</span><b>随机 20 题</b><small>优先抽取未练题</small></button><button class="card action" onclick="start({n:50,random:true})"><span class="big">🔥</span><b>冲刺 50 题</b><small>集中刷一轮</small></button><button class="card action" onclick="wrongStart()"><span class="big">❌</span><b>错题重练</b><small>${wrongN?wrongN+' 道错题待巩固':'目前没有错题'}</small></button><button class="card action" onclick="mock()"><span class="big">⏱️</span><b>正式模拟</b><small>自定义题量 · 自定义时间 · 自动计时</small></button></div>
 <div class="title">更多</div><div class="grid"><button class="card action" onclick="custom()"><span class="big">🎯</span><b>自定义练习</b><small>章节、题型、难度、数量</small></button><button class="card action" onclick="searchPage()"><span class="big">🔎</span><b>搜索题库</b><small>题干、选项、章节均可搜</small></button><button class="card action" onclick="libraryManager()"><span class="big">📚</span><b>题库管理</b><small>导入、切换、合并、去重</small></button><button class="card action" onclick="exportData()"><span class="big">💾</span><b>备份学习记录</b><small>换手机也能恢复</small></button></div></div>`;}
 function practice(){const q=qs();document.getElementById('practice').innerHTML=`<div class="title">练习中心</div><div class="chips"><button class="on" onclick="start({n:20,random:true})">随机</button><button onclick="start({n:20,random:false})">顺序</button><button onclick="wrongStart()">错题</button><button onclick="favStart()">收藏</button></div><div class="title">当前题库：${esc(current().name)}</div><div class="card"><b>${q.length} 题</b><p class="muted">支持单选、多选、判断、填空；练习模式即时判分并自动记录错题。</p><button class="btn" onclick="custom()">打开自定义练习</button></div><div class="title">题型</div><div class="grid">${types().map(t=>`<button class="card action" onclick='start({n:20,random:true,type:${JSON.stringify(t)}})'><span class="big">${t==='单选题'?'🔘':t==='多选题'?'☑️':t==='判断题'?'✅':'✍️'}</span><b>${esc(t)}</b><small>${q.filter(x=>x.type===t).length} 题</small></button>`).join('')}</div>`;}
 function start(o={}){let pool=(o.pool||qs()).slice();if(o.type)pool=pool.filter(q=>q.type===o.type);if(o.chapter)pool=pool.filter(q=>q.chapter===o.chapter);if(o.difficulty)pool=pool.filter(q=>q.difficulty===o.difficulty);if(o.unanswered){const u=pool.filter(q=>!S.answered[key(S.active,q.id)]);pool=u.length?u:pool;}if(o.wrongOnly)pool=pool.filter(q=>S.wrong[key(S.active,q.id)]);if(o.favOnly)pool=pool.filter(q=>S.fav[key(S.active,q.id)]);if(o.random)pool=shuffle(pool);const n=Math.min(o.n||20,pool.length);pool=pool.slice(0,n);if(!pool.length){toast('当前筛选下没有题目');return;}const visible=[...document.querySelectorAll('.page.on')][0];const from=(visible&&visible.id&&visible.id!=='quiz')?visible.id:'home';sess={lib:S.active,list:pool,i:0,ans:{},checked:{},recorded:{},kind:o.kind||'practice',mode:o.mode||'practice',limit:o.limit||0,start:Date.now(),from};try{history.pushState({app:true,quiz:true},'',location.href)}catch(e){}go('quiz');renderQuiz();}
 function wrongStart(){const pool=qs().filter(q=>S.wrong[key(S.active,q.id)]);start({pool,n:pool.length,random:true,kind:'wrong',wrongOnly:true});}
 function favStart(){const pool=qs().filter(q=>S.fav[key(S.active,q.id)]);start({pool,n:pool.length,random:true,kind:'fav'});}
-function mock(){start({pool:shuffle(qs()).slice(0,50),n:50,kind:'mock',mode:'exam',limit:45*60});}
+function mock(){
+const total=qs().length;
+document.getElementById('sheet').innerHTML=`<h3>⏱️ 正式模拟</h3><p class="muted">自定义本次模拟的题目数量和考试时间。系统会随机抽题，进入后按整卷模式计时，最后统一交卷。</p><div class="stack"><label>题目数量<input id="examN" class="field" type="number" min="1" max="${Math.max(1,total)}" value="50"></label><label>考试时间（分钟）<input id="examMin" class="field" type="number" min="1" max="600" value="45"></label><div class="notice">📌 当前题库共 ${total} 题；题目数量不能超过当前题库数量。</div><button class="btn" onclick="runMockCustom()">开始模拟</button></div>`;
+addModalClose();document.getElementById('modal').classList.add('on');
+}
+function runMockCustom(){
+const total=qs().length;
+const n=Math.max(1,Math.min(total,parseInt(document.getElementById('examN').value,10)||50));
+const min=Math.max(1,Math.min(600,parseInt(document.getElementById('examMin').value,10)||45));
+closeModal();
+start({pool:shuffle(qs()),n,kind:'mock',mode:'exam',limit:min*60});
+}
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a;}
 function ans(q){return String(q.answer??'').trim().toUpperCase()}
 function multi(q){return q.type==='多选题'}
@@ -292,10 +303,11 @@ function parseXLSBytes(buf){
    else if(id===0x0201){const row=u16(a,d),c=u16(a,d+2);if(!rows[row])rows[row]=[];rows[row][c]=biffLabel(a,d+6,e);}
    else if(id===0x0006){
      const row=u16(a,d),c=u16(a,d+2);if(!rows[row])rows[row]=[];
-     const typ=a[d+12];
-     if(typ===0) rows[row][c]=String(f64(a,d+6));
-     else if(typ===1){ pendingFormulaStringCell={row,c}; }
-     else rows[row][c]='';
+     // BIFF8 FORMULA 的结果区：字符串结果不是看 d+12 的字节类型，
+     // 而是结果前两个字节为 0xFFFF。旧版这里判断错了，导致少数公式生成的 A-D 选项全部丢失。
+     const stringResult=(u16(a,d+6)===0xFFFF && u16(a,d+8)===0xFFFF);
+     if(stringResult) pendingFormulaStringCell={row,c};
+     else rows[row][c]=String(f64(a,d+6));
    }
    else if(id===0x0207 && pendingFormulaStringCell){
      const {row,c}=pendingFormulaStringCell;
