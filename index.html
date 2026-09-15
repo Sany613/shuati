@@ -22,7 +22,7 @@ main{padding:15px}.page{display:none}.page.on{display:block}.hero{background:lin
 .brand-version{display:inline-block;margin-left:5px;padding:1px 6px;border:1px solid currentColor;border-radius:999px;font-size:.55em;font-weight:600;opacity:.65;vertical-align:middle;line-height:1.25}
 </style></head>
 <body>
-<div class="app"><header><div class="top"><div><div class="brand">刷题通 <span class="brand-version">V6.7</span></div><div class="sub" id="subhead">多题库 · 智能练习 · 模拟考试</div></div><button class="gear" onclick="settings()">⚙️</button></div></header>
+<div class="app"><header><div class="top"><div><div class="brand">刷题通 <span class="brand-version">V6.8</span></div><div class="sub" id="subhead">多题库 · 智能练习 · 模拟考试</div></div><button class="gear" onclick="settings()">⚙️</button></div></header>
 <main><section id="home" class="page on"></section><section id="practice" class="page"></section><section id="wrong" class="page"></section><section id="fav" class="page"></section><section id="stats" class="page"></section><section id="quiz" class="page"></section></main>
 <div class="bottom"><nav class="nav"><button data-p="home" onclick="go('home')"><i>⌂</i>首页</button><button data-p="practice" onclick="go('practice')"><i>◉</i>练习</button><button data-p="wrong" onclick="go('wrong')"><i>✕</i>错题</button><button data-p="fav" onclick="go('fav')"><i>☆</i>收藏</button><button data-p="stats" onclick="go('stats')"><i>▥</i>统计</button></nav></div></div>
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div><div id="toast" class="toast"></div>
@@ -146,6 +146,12 @@ function autoRepairQuestionBank(arr){
     // 修复选项前缀：A. xxx / A、xxx / A) xxx
     x.options=x.options.map((v,i)=>v.replace(new RegExp('^\\s*'+String.fromCharCode(65+i)+'\\s*[.、)）:：]\\s*'),'').trim());
     x.answer=norm(x.answer).replace(/^答案\\s*[:：]?\\s*/i,'').trim();
+    // 旧版 XLS 中有少数题目被标成“单选题”，但实际上没有 A-D 选项，答案是文字填空。自动纠正为填空题。
+    const optCount=x.options.filter(Boolean).length;
+    const answerLooksChoice=/^[ABCD](?:[、,，;；+＋\s]*[ABCD])*$/i.test(x.answer);
+    if((String(x.type).includes('单选')||String(x.type).includes('多选')) && optCount===0 && !answerLooksChoice && x.answer){
+      x.type='填空题';
+    }
     if(String(x.type).includes('判断')){
       const z=x.answer.toUpperCase();
       if(['T','TRUE','正确','√','对','是'].includes(z))x.answer='T';
@@ -267,6 +273,7 @@ function parseXLSBytes(buf){
    }
  }
  // Parse cell records after SST has been reconstructed.
+ let pendingFormulaStringCell=null;
  for(const r of recs){const {id,d,e}=r;
    if(id===0x0204){const row=u16(a,d),c=u16(a,d+2);if(!rows[row])rows[row]=[];rows[row][c]=biffLabel(a,d+6,e);}
    else if(id===0x00FD){const row=u16(a,d),c=u16(a,d+2),ix=u32(a,d+6);if(!rows[row])rows[row]=[];rows[row][c]=sst[ix]??'';}
@@ -274,7 +281,19 @@ function parseXLSBytes(buf){
    else if(id===0x027E){const row=u16(a,d),c=u16(a,d+2),rk=u32(a,d+6);if(!rows[row])rows[row]=[];let v;if(rk&2)v=i32(a,d+6)>>2;else{const tmp=new Uint8Array(8);tmp.set(a.subarray(d+6,d+10));v=f64(tmp,0);}if(rk&1)v/=100;rows[row][c]=String(v);}
    else if(id===0x0205){const row=u16(a,d),c=u16(a,d+2);if(!rows[row])rows[row]=[];rows[row][c]=a[d+6]?'TRUE':'FALSE';}
    else if(id===0x0201){const row=u16(a,d),c=u16(a,d+2);if(!rows[row])rows[row]=[];rows[row][c]=biffLabel(a,d+6,e);}
-   else if(id===0x0006){const row=u16(a,d),c=u16(a,d+2);if(!rows[row])rows[row]=[];const typ=a[d+12];rows[row][c]=typ===0?String(f64(a,d+6)):'';}
+   else if(id===0x0006){
+     const row=u16(a,d),c=u16(a,d+2);if(!rows[row])rows[row]=[];
+     const typ=a[d+12];
+     if(typ===0) rows[row][c]=String(f64(a,d+6));
+     else if(typ===1){ pendingFormulaStringCell={row,c}; }
+     else rows[row][c]='';
+   }
+   else if(id===0x0207 && pendingFormulaStringCell){
+     const {row,c}=pendingFormulaStringCell;
+     const str=biffLabel(a,d,e);
+     if(!rows[row])rows[row]=[]; rows[row][c]=str;
+     pendingFormulaStringCell=null;
+   }
    else if(id===0x00BD){const row=u16(a,d),c=u16(a,d+2),n=u16(a,d+4);if(!rows[row])rows[row]=[];for(let j=0;j<n;j++){const off=d+6+j*6;const rk=u32(a,off+2);let v=(rk&2)?(i32(a,off+2)>>2):0;if(!(rk&2)){const tmp=new Uint8Array(8);tmp.set(a.subarray(off+2,off+6));v=f64(tmp,0);}if(rk&1)v/=100;rows[row][c+j]=String(v);}}
  }
  return rows.filter(Boolean).map(r=>{const x=[];for(let i=0;i<r.length;i++)x[i]=r[i]??'';return x;});
